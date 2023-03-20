@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch.optim as optim
 import torch.nn as nn
+from torchvision.models import ResNet18_Weights
 
 from CNN import *
 
@@ -17,7 +18,7 @@ transform = transforms.Compose(
     [transforms.ToTensor(),
      transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
-batch_size = 4
+batch_size = 64
 
 trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
                                         download=True, transform=transform)
@@ -95,7 +96,7 @@ def train_gpu(net):
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
-    for epoch in range(2):  # loop over the dataset multiple times
+    for epoch in range(16):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
@@ -113,13 +114,12 @@ def train_gpu(net):
 
             # print statistics
             running_loss += loss.item()
-            if i % 2000 == 1999:  # print every 2000 mini-batches
-                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}')
+            if i % 10 == 9:  # print every 2000 mini-batches
+                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 10:.3f}')
                 running_loss = 0.0
 
     print('Finished Training')
     torch.save(net.state_dict(), PATH)
-
 
 def test(net):
     correct = 0
@@ -128,6 +128,22 @@ def test(net):
     with torch.no_grad():
         for data in testloader:
             images, labels = data
+            # calculate outputs by running images through the network
+            outputs = net(images)
+            # the class with the highest energy is what we choose as prediction
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    print(f'Accuracy of the network on the 10000 test images: {100 * correct // total} %')
+
+def test_gpu(net):
+    correct = 0
+    total = 0
+    # since we're not training, we don't need to calculate the gradients for our outputs
+    with torch.no_grad():
+        for data in testloader:
+            images, labels = data[0].to(device), data[1].to(device)
             # calculate outputs by running images through the network
             outputs = net(images)
             # the class with the highest energy is what we choose as prediction
@@ -146,7 +162,7 @@ def classAccuracy(net):
     # again no gradients needed
     with torch.no_grad():
         for data in testloader:
-            images, labels = data
+            images, labels = data[0].to(device), data[1].to(device)
             outputs = net(images)
             _, predictions = torch.max(outputs, 1)
             # collect the correct predictions for each class
@@ -163,9 +179,9 @@ def classAccuracy(net):
 
 def main():
     #net = Net()
-    net = LeNet()
-    net.load_state_dict(torch.load(PATH))
-
+    #net = LeNet()
+    net = torchvision.models.resnet18(weights=ResNet18_Weights.DEFAULT)
+    #net.load_state_dict(torch.load(PATH))
 
     # Assuming that we are on a CUDA machine, this should print a CUDA device:
     print(device)
@@ -173,15 +189,15 @@ def main():
         print('Switching to cuda device')
         net.to(device)
         train_gpu(net)
+        test_gpu(net)
+        classAccuracy(net)
     else:
         print('Training on cpu')
         train(net)
-
-    test(net)
-    classAccuracy(net)
+        test(net)
 
     # Show images and ground-truth vs predicted
-    plotImage(net)
+    #plotImage(net)
 
 
 if __name__ == '__main__':
