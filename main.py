@@ -5,13 +5,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch.optim as optim
 import torch.nn as nn
-from torchvision.models import ResNet18_Weights
+from torch.utils.tensorboard import SummaryWriter
+
 
 from CNN import *
 
 PATH = './cifar_net.pth'
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+writer = SummaryWriter('runs/resnet18')
 
 # Load image train & test data
 transform = transforms.Compose(
@@ -114,8 +117,9 @@ def train_gpu(net):
 
             # print statistics
             running_loss += loss.item()
-            if i % 10 == 9:  # print every 2000 mini-batches
-                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 10:.3f}')
+            if i % 50 == 49:  # print every 2000 mini-batches
+                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 50:.3f}')
+                writer.add_scalar('training loss', running_loss / 50, epoch * len(trainloader) + i)
                 running_loss = 0.0
 
     print('Finished Training')
@@ -180,7 +184,7 @@ def classAccuracy(net):
 def main():
     #net = Net()
     #net = LeNet()
-    net = torchvision.models.resnet18(weights=ResNet18_Weights.DEFAULT)
+    net = torchvision.models.resnet18(pretained=True)
     #net.load_state_dict(torch.load(PATH))
 
     # Assuming that we are on a CUDA machine, this should print a CUDA device:
@@ -195,7 +199,11 @@ def main():
         print('Training on cpu')
         train(net)
         test(net)
+        #classAccuracy(net)
+    dataiter = iter(trainloader)
+    writer.add_graph(net, next(dataiter))
 
+    writer.close()
     # Show images and ground-truth vs predicted
     #plotImage(net)
 
