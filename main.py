@@ -1,7 +1,7 @@
 import torch
 import torchvision
 import torchvision.transforms as transforms
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 import torch.optim as optim
 import torch.nn as nn
@@ -50,28 +50,28 @@ classes = ('plane', 'car', 'bird', 'cat',
 
 # functions to show an image
 
-def imshow(img):
-    img = img / 2 + 0.5     # unnormalize
-    npimg = img.numpy()
-    plt.imshow(np.transpose(npimg, (1, 2, 0)))
-    plt.show()
+# def imshow(img):
+#     img = img / 2 + 0.5     # unnormalize
+#     npimg = img.numpy()
+#     plt.imshow(np.transpose(npimg, (1, 2, 0)))
+#     plt.show()
 
 
-def plotImage(net):
-    # get some random training images
-    dataiter = iter(trainloader)
-    images, labels = next(dataiter)
-
-    # print images
-    imshow(torchvision.utils.make_grid(images))
-    print('GroundTruth: ', ' '.join(f'{classes[labels[j]]:5s}' for j in range(4)))
-
-    outputs = net(images)
-
-    _, predicted = torch.max(outputs, 1)
-
-    print('Predicted: ', ' '.join(f'{classes[predicted[j]]:5s}'
-                                  for j in range(4)))
+# def plotImage(net):
+#     # get some random training images
+#     dataiter = iter(trainloader)
+#     images, labels = next(dataiter)
+#
+#     # print images
+#     imshow(torchvision.utils.make_grid(images))
+#     print('GroundTruth: ', ' '.join(f'{classes[labels[j]]:5s}' for j in range(4)))
+#
+#     outputs = net(images)
+#
+#     _, predicted = torch.max(outputs, 1)
+#
+#     print('Predicted: ', ' '.join(f'{classes[predicted[j]]:5s}'
+#                                   for j in range(4)))
 
 
 def train(net):
@@ -195,7 +195,6 @@ def classAccuracy(net):
 
 
 def main():
-    #net = Net()
     #net = LeNet()
     net = torchvision.models.resnet18(pretrained=True)
     net.load_state_dict(torch.load(PATH))
