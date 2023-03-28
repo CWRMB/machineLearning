@@ -6,15 +6,26 @@ import numpy as np
 import torch.optim as optim
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
+import neptune
 
 
 from CNN import *
 
 PATH = './cifar_net.pth'
 
+rate_learning = 0.001
+
+run = neptune.init_run(
+    project="vidarlab/CIFA10Training",
+    api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vbmV3LXVpLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9uZXctdWkubmVwdHVuZS5haSIsImFwaV9rZXkiOiJjMzhhZjM5OS1kZjdjLTQ3MzAtODcyMS0yN2JiMWQyNDhhMGYifQ==",
+)
+params = {"learning_rate": rate_learning, "optimizer": "Adam"}
+run["parameters"] = params
+
+
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-writer = SummaryWriter('runs/resnet18')
+#writer = SummaryWriter('runs/resnet18')
 
 # Load image train & test data
 transform = transforms.Compose(
@@ -86,8 +97,8 @@ def train(net):
 
             # print statistics
             running_loss += loss.item()
-            if i % 2000 == 1999:  # print every 2000 mini-batches
-                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}')
+            if i % 50 == 49:  # print every 2000 mini-batches
+                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 50:.3f}')
                 running_loss = 0.0
 
     print('Finished Training')
@@ -97,9 +108,10 @@ def train(net):
 def train_gpu(net):
     # Define loss function & optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.Adam(net.parameters(), lr=rate_learning)
 
-    for epoch in range(16):  # loop over the dataset multiple times
+
+    for epoch in range(32):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
@@ -119,7 +131,8 @@ def train_gpu(net):
             running_loss += loss.item()
             if i % 50 == 49:  # print every 2000 mini-batches
                 print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 50:.3f}')
-                writer.add_scalar('training loss', running_loss / 50, epoch * len(trainloader) + i)
+                #writer.add_scalar('training loss', running_loss / 50, epoch * len(trainloader) + i)
+                run["train/loss"].append(running_loss / 50, epoch * len(trainloader) + i)
                 running_loss = 0.0
 
     print('Finished Training')
@@ -184,8 +197,8 @@ def classAccuracy(net):
 def main():
     #net = Net()
     #net = LeNet()
-    net = torchvision.models.resnet18(pretained=True)
-    #net.load_state_dict(torch.load(PATH))
+    net = torchvision.models.resnet18(pretrained=True)
+    net.load_state_dict(torch.load(PATH))
 
     # Assuming that we are on a CUDA machine, this should print a CUDA device:
     print(device)
@@ -200,10 +213,11 @@ def main():
         train(net)
         test(net)
         #classAccuracy(net)
-    dataiter = iter(trainloader)
-    writer.add_graph(net, next(dataiter))
+    run.stop()
+    #dataiter = iter(trainloader)
+    #writer.add_graph(net, next(dataiter))
 
-    writer.close()
+    #writer.close()
     # Show images and ground-truth vs predicted
     #plotImage(net)
 
