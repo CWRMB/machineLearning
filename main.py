@@ -5,22 +5,20 @@ import torchvision.transforms as transforms
 import numpy as np
 import torch.optim as optim
 import torch.nn as nn
-from torch.utils.tensorboard import SummaryWriter
+#from torch.utils.tensorboard import SummaryWriter
 import neptune
-
+from torch.utils.data import random_split
 
 from CNN import *
 
 PATH = './cifar_net.pth'
 
-rate_learning = 0.001
+rate_learning = 0.0001
 
 run = neptune.init_run(
     project="vidarlab/CIFA10Training",
     api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vbmV3LXVpLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9uZXctdWkubmVwdHVuZS5haSIsImFwaV9rZXkiOiJjMzhhZjM5OS1kZjdjLTQ3MzAtODcyMS0yN2JiMWQyNDhhMGYifQ==",
 )
-params = {"learning_rate": rate_learning, "optimizer": "Adam"}
-run["parameters"] = params
 
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -32,12 +30,27 @@ transform = transforms.Compose(
     [transforms.ToTensor(),
      transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
-batch_size = 64
+batch_size = 256
+
+params = {
+    "learning_rate": rate_learning,
+    "optimizer": "Adam",
+    "batch_size":batch_size,
+    "epochs": 24
+}
+run["parameters"] = params
+
 
 trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
                                         download=True, transform=transform)
+
+# Split our data 5:1 ratio for validation and training loss
+trainset, validset = random_split(trainset, [50000,10000])
+
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
                                           shuffle=True, num_workers=2)
+# setup our validation loader
+validloader = torch.utils.data.DataLoader(validset, batch_size)
 
 testset = torchvision.datasets.CIFAR10(root='./data', train=False,
                                        download=True, transform=transform)
@@ -111,7 +124,7 @@ def train_gpu(net):
     optimizer = optim.Adam(net.parameters(), lr=rate_learning)
 
 
-    for epoch in range(32):  # loop over the dataset multiple times
+    for epoch in range(24):  # loop over the dataset multiple times
 
         running_loss = 0.0
         for i, data in enumerate(trainloader, 0):
@@ -132,8 +145,22 @@ def train_gpu(net):
             if i % 50 == 49:  # print every 2000 mini-batches
                 print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 50:.3f}')
                 #writer.add_scalar('training loss', running_loss / 50, epoch * len(trainloader) + i)
-                run["train/loss"].append(running_loss / 50, epoch * len(trainloader) + i)
+                run["train/loss"].append(running_loss / 50)
                 running_loss = 0.0
+
+        #Calculate our validation loss
+        valid_loss = 0.0
+        net.eval()
+        for data, labels in validloader:
+            data, labels = data.cuda(), labels.cuda()
+
+            target = net(data)
+            loss = criterion(target, labels)
+            valid_loss = loss.item() * data.size(0)
+
+            if data % 50 == 49:
+                print(f'[{epoch + 1}, {data + 1:5d}] valid_loss: {valid_loss / 50:.3f}')
+                run["train/valid_loss"].append(valid_loss / 50)
 
     print('Finished Training')
     torch.save(net.state_dict(), PATH)
@@ -151,6 +178,7 @@ def test(net):
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+            #run["test/accuracy"].append(100*correct // total)
 
     print(f'Accuracy of the network on the 10000 test images: {100 * correct // total} %')
 
@@ -197,7 +225,12 @@ def classAccuracy(net):
 def main():
     #net = LeNet()
     net = torchvision.models.resnet18(pretrained=True)
+    #net.fc.register_forward_hook(lambda m, inp, out: F.dropout(out, p=0.5, training=m.training))
     net.load_state_dict(torch.load(PATH))
+    net.fc = nn.Sequential(
+        nn.Dropout(0.5),
+        nn.Linear(net.fc.in_features, 10)
+    )
 
     # Assuming that we are on a CUDA machine, this should print a CUDA device:
     print(device)
