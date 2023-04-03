@@ -44,8 +44,8 @@ run["parameters"] = params
 trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
                                         download=True, transform=transform)
 
-# Split our data 5:1 ratio for validation and training loss
-trainset, validset = random_split(trainset, [50000,10000])
+# Split our data ratio for validation and training loss
+trainset, validset = random_split(trainset, [0.833 * len(trainset), 0.166 * len(trainset)])
 
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
                                           shuffle=True, num_workers=2)
@@ -127,6 +127,7 @@ def train_gpu(net):
     for epoch in range(24):  # loop over the dataset multiple times
 
         running_loss = 0.0
+        net.train()
         for i, data in enumerate(trainloader, 0):
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data[0].to(device), data[1].to(device)
@@ -142,25 +143,30 @@ def train_gpu(net):
 
             # print statistics
             running_loss += loss.item()
-            if i % 50 == 49:  # print every 2000 mini-batches
-                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 50:.3f}')
+            if i % 10 == 9:  # print every 2000 mini-batches
+                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 10:.3f}')
                 #writer.add_scalar('training loss', running_loss / 50, epoch * len(trainloader) + i)
-                run["train/loss"].append(running_loss / 50)
+                # run["train/loss"].append(running_loss / len(testloader))
                 running_loss = 0.0
 
         #Calculate our validation loss
         valid_loss = 0.0
         net.eval()
-        for data, labels in validloader:
-            data, labels = data.cuda(), labels.cuda()
+        for i, data in enumerate(validloader,0):
+            inputs, labels = data[0].to(device), data[1].to(device)
 
-            target = net(data)
+            target = net(inputs)
             loss = criterion(target, labels)
-            valid_loss = loss.item() * data.size(0)
+            valid_loss = loss.item() * inputs.size(0)
 
-            if data % 50 == 49:
-                print(f'[{epoch + 1}, {data + 1:5d}] valid_loss: {valid_loss / 50:.3f}')
-                run["train/valid_loss"].append(valid_loss / 50)
+            # if i % 10 == 9:
+            #     print(f'[{epoch + 1}, {i + 1:5d}] valid_loss: {valid_loss / len(validloader):.3f}')
+            #     run["train/valid_loss"].append(valid_loss / len(validloader))
+        print(
+            f'Epoch {epoch + 1} \t\t Training Loss: {running_loss / len(trainloader)}'
+            f' \t\t Validation Loss: {valid_loss / len(validloader)}')
+        run["train/loss"].append(running_loss / len(testloader))
+        run["train/valid_loss"].append(valid_loss / len(validloader))
 
     print('Finished Training')
     torch.save(net.state_dict(), PATH)
