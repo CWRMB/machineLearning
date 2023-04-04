@@ -13,9 +13,10 @@ from CNN import *
 
 PATH = './cifar_net.pth'
 
-rate_learning = 0.0001
+rate_learning = 0.001
 
 run = neptune.init_run(
+    name="ResNet18 & DropOut & Data Aug",
     project="vidarlab/CIFA10Training",
     api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vbmV3LXVpLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9uZXctdWkubmVwdHVuZS5haSIsImFwaV9rZXkiOiJjMzhhZjM5OS1kZjdjLTQ3MzAtODcyMS0yN2JiMWQyNDhhMGYifQ==",
 )
@@ -27,18 +28,18 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 # Load image train & test data
 transform = transforms.Compose(
-    [transforms.ToTensor(),
-     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+     [transforms.RandomHorizontalFlip(),
+      transforms.RandomGrayscale(),
+      transforms.ToTensor(),
+      transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
 
 batch_size = 256
 
-min_valid_loss = np.inf
-
 params = {
     "learning_rate": rate_learning,
-    "optimizer": "Adam",
+    "optimizer": "RMSProp",
     "batch_size":batch_size,
-    "epochs": 24
+    "epochs": 32
 }
 run["parameters"] = params
 
@@ -46,47 +47,21 @@ run["parameters"] = params
 trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
                                         download=True, transform=transform)
 
-# Split our data ratio for validation and training loss
-trainset, validset = random_split(trainset, [40000, 10000])
-
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
                                           shuffle=True, num_workers=2)
-# setup our validation loader
-validloader = torch.utils.data.DataLoader(validset, batch_size)
 
 testset = torchvision.datasets.CIFAR10(root='./data', train=False,
                                        download=True, transform=transform)
 testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
                                          shuffle=False, num_workers=2)
 
+validset = testset
+# setup our validation loader
+validloader = torch.utils.data.DataLoader(validset, batch_size)
+
+
 classes = ('plane', 'car', 'bird', 'cat',
            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-
-
-# functions to show an image
-
-# def imshow(img):
-#     img = img / 2 + 0.5     # unnormalize
-#     npimg = img.numpy()
-#     plt.imshow(np.transpose(npimg, (1, 2, 0)))
-#     plt.show()
-
-
-# def plotImage(net):
-#     # get some random training images
-#     dataiter = iter(trainloader)
-#     images, labels = next(dataiter)
-#
-#     # print images
-#     imshow(torchvision.utils.make_grid(images))
-#     print('GroundTruth: ', ' '.join(f'{classes[labels[j]]:5s}' for j in range(4)))
-#
-#     outputs = net(images)
-#
-#     _, predicted = torch.max(outputs, 1)
-#
-#     print('Predicted: ', ' '.join(f'{classes[predicted[j]]:5s}'
-#                                   for j in range(4)))
 
 
 def train(net):
@@ -123,11 +98,11 @@ def train(net):
 def train_gpu(net):
     # Define loss function & optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(net.parameters(), lr=rate_learning)
+    optimizer = optim.RMSprop(net.parameters(), lr=rate_learning, alpha=0.99,
+                              eps=1e-08,weight_decay=0, momentum=0, centered=False)
+    min_valid_loss = np.inf
 
-
-    for epoch in range(24):  # loop over the dataset multiple times
-
+    for epoch in range(32):  # loop over the dataset multiple times
         running_loss = 0.0
         net.train()
         for i, data in enumerate(trainloader, 0):
@@ -147,8 +122,6 @@ def train_gpu(net):
             running_loss += loss.item()
             if i % 10 == 9:  # print every 2000 mini-batches
                 print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 10:.3f}')
-                #writer.add_scalar('training loss', running_loss / 50, epoch * len(trainloader) + i)
-                # run["train/loss"].append(running_loss / len(testloader))
                 running_loss = 0.0
 
         #Calculate our validation loss
@@ -168,7 +141,7 @@ def train_gpu(net):
             f'Epoch {epoch + 1} \t\t Training Loss: {running_loss / len(trainloader)}'
             f' \t\t Validation Loss: {valid_loss / len(validloader)}')
         run["train/loss"].append(running_loss / len(testloader))
-        run["train/valid_loss"].append(valid_loss / len(validloader))
+        run["train/loss"].append(valid_loss / len(validloader))
 
         if min_valid_loss > valid_loss:
             print(f'Validation Loss Decreased({min_valid_loss:.6f}--->{valid_loss:.6f})'
@@ -237,13 +210,16 @@ def classAccuracy(net):
 
 def main():
     #net = LeNet()
-    net = torchvision.models.resnet18(pretrained=True)
+    # net = torchvision.models.resnet18(pretrained=True)
+    net = ResNetWithDropout(num_classes=10, p=0.5)
     #net.fc.register_forward_hook(lambda m, inp, out: F.dropout(out, p=0.5, training=m.training))
+
     #net.load_state_dict(torch.load(PATH))
-    net.fc = nn.Sequential(
-        nn.Dropout(0.5),
-        nn.Linear(net.fc.in_features, 10)
-    )
+
+    # net.fc = nn.Sequential(
+    #     nn.Dropout(0.5),
+    #     nn.Linear(net.fc.in_features, 10)
+    # )
 
     # Assuming that we are on a CUDA machine, this should print a CUDA device:
     print(device)
@@ -251,6 +227,7 @@ def main():
         print('Switching to cuda device')
         net.to(device)
         train_gpu(net)
+        net.load_state_dict(torch.load(PATH))
         test_gpu(net)
         classAccuracy(net)
     else:
@@ -259,10 +236,6 @@ def main():
         test(net)
         #classAccuracy(net)
     run.stop()
-    #dataiter = iter(trainloader)
-    #writer.add_graph(net, next(dataiter))
-
-    #writer.close()
     # Show images and ground-truth vs predicted
     #plotImage(net)
 

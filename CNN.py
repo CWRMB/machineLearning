@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision
 
 
 class Net(nn.Module):
@@ -53,4 +54,30 @@ class LeNet(nn.Module):
         x = F.relu(self.fc1(x))
         x = self.dropout1(x)  # Applying dropout b/t layers which exchange highest parameters. This is a good practice
         x = self.fc2(x)
+        return x
+
+
+class ResNetWithDropout(nn.Module):
+    def __init__(self, num_classes, p=0.5):
+        super(ResNetWithDropout, self).__init__()
+        self.resnet = torchvision.models.resnet18(pretrained=True)
+        self.dropout = nn.Dropout(p)
+        self.fc = nn.Linear(512, num_classes)
+
+    def forward(self, x):
+        x = self.resnet.conv1(x)
+        x = self.resnet.bn1(x)
+        x = self.resnet.relu(x)
+        x = self.resnet.maxpool(x)
+
+        x = self.resnet.layer1(x)
+        x = self.resnet.layer2(x)
+        x = self.resnet.layer3(x)
+        x = self.resnet.layer4(x)
+
+        x = self.resnet.avgpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.dropout(x)
+        x = self.fc(x)
+
         return x
