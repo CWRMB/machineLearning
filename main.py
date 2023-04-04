@@ -32,6 +32,8 @@ transform = transforms.Compose(
 
 batch_size = 256
 
+min_valid_loss = np.inf
+
 params = {
     "learning_rate": rate_learning,
     "optimizer": "Adam",
@@ -45,7 +47,7 @@ trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
                                         download=True, transform=transform)
 
 # Split our data ratio for validation and training loss
-trainset, validset = random_split(trainset, [0.833 * len(trainset), 0.166 * len(trainset)])
+trainset, validset = random_split(trainset, [40000, 10000])
 
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
                                           shuffle=True, num_workers=2)
@@ -168,8 +170,13 @@ def train_gpu(net):
         run["train/loss"].append(running_loss / len(testloader))
         run["train/valid_loss"].append(valid_loss / len(validloader))
 
+        if min_valid_loss > valid_loss:
+            print(f'Validation Loss Decreased({min_valid_loss:.6f}--->{valid_loss:.6f})'
+                  f' \t Saving The Model')
+            min_valid_loss = valid_loss
+            torch.save(net.state_dict(), PATH)
+
     print('Finished Training')
-    torch.save(net.state_dict(), PATH)
 
 def test(net):
     correct = 0
@@ -232,7 +239,7 @@ def main():
     #net = LeNet()
     net = torchvision.models.resnet18(pretrained=True)
     #net.fc.register_forward_hook(lambda m, inp, out: F.dropout(out, p=0.5, training=m.training))
-    net.load_state_dict(torch.load(PATH))
+    #net.load_state_dict(torch.load(PATH))
     net.fc = nn.Sequential(
         nn.Dropout(0.5),
         nn.Linear(net.fc.in_features, 10)
