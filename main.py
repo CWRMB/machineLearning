@@ -33,7 +33,7 @@ transform = transforms.Compose(
       transforms.ToTensor(),
       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
 
-batch_size = 512
+batch_size = 256
 
 params = {
     "learning_rate": rate_learning,
@@ -105,6 +105,7 @@ def train_gpu(net):
     for epoch in range(32):  # loop over the dataset multiple times
         running_loss = 0.0
         running_correct = 0
+        total = 0
         net.train()
         for i, data in enumerate(trainloader, 0):
             # get the inputs; data is a list of [inputs, labels]
@@ -119,16 +120,17 @@ def train_gpu(net):
             loss.backward()
             optimizer.step()
 
-            # calculate loss and correct
+            # calculate loss and number of correct
             running_loss += loss.item()
-            _, preds = torch.max(outputs, 1)
+            _, preds = torch.max(outputs.data, 1)
+            total += labels.size(0)
             running_correct += (preds == labels).sum().item()
+            train_loss = running_loss / len(trainloader)
 
             if i % 10 == 9:  # print every 10 mini-batch
-                # print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 10:.3f}')
                 print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 10:.3f} '
-                      f'Acc: {running_correct / ((i + 1) * batch_size):.3f}')
-                train_loss = running_loss / 10
+                      f'Acc: {100 * running_correct // total:.3f}')
+                #train_loss = running_loss / 10
                 running_loss = 0.0
 
                 # Calculate our validation loss
@@ -148,7 +150,7 @@ def train_gpu(net):
 
                 run["train/valid_loss"].append(valid_loss)
                 run["train/loss"].append(train_loss)
-                run["train/accuracy"].append(running_correct / ((i + 1) * batch_size))
+                run["train/accuracy"].append(100 * running_correct // total)
 
                 running_correct = 0
 
