@@ -125,42 +125,38 @@ def train_gpu(net):
             _, preds = torch.max(outputs.data, 1)
             total += labels.size(0)
             running_correct += (preds == labels).sum().item()
-            train_loss = running_loss / len(trainloader)
 
-            if i % 10 == 9:  # print every 10 mini-batch
-                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 10:.3f} '
-                      f'Acc: {100 * running_correct // total:.3f}')
-                #train_loss = running_loss / 10
-                running_loss = 0.0
+        # Calculate our validation loss
+        with torch.no_grad():
+            valid_loss = 0.0
+            net.eval()
+            for j, valid_data in enumerate(validloader,0):
+                valid_inputs, valid_labels = valid_data[0].to(device), valid_data[1].to(device)
+                valid_outputs = net(valid_inputs)
+                valid_loss = criterion(valid_outputs, valid_labels) * valid_inputs.size(0)
 
-                # Calculate our validation loss
-                with torch.no_grad():
-                    valid_loss = 0.0
-                    net.eval()
-                    for j, valid_data in enumerate(validloader,0):
-                        valid_inputs, valid_labels = valid_data[0].to(device), valid_data[1].to(device)
-                        valid_outputs = net(valid_inputs)
-                        valid_loss = criterion(valid_outputs, valid_labels) * valid_inputs.size(0)
+            valid_loss /= len(validloader)
 
-                    valid_loss /= len(validloader)
+        # Calculate the training loss
+        train_loss = running_loss / len(trainloader)
+        accu = 100.*running_correct/total
 
-                # Calculate the training loss
-                print(f'Epoch {epoch + 1} \t\t Training Loss: {train_loss:.6f}'
-                      f' \t\t Validation Loss: {valid_loss:.6f}')
+        print(f'Epoch {epoch + 1} \t\t Training Loss: {train_loss:.6f}'
+              f' \t\t Validation Loss: {valid_loss:.6f}' 
+              f'Acc%: {accu:.3f}')
 
-                run["train/valid_loss"].append(valid_loss)
-                run["train/loss"].append(train_loss)
-                run["train/accuracy"].append(100 * running_correct // total)
+        run["train/valid_loss"].append(valid_loss)
+        run["train/loss"].append(train_loss)
+        run["train/accuracy"].append(accu)
 
-                running_correct = 0
-
-                if min_valid_loss > valid_loss:
-                    print(f'Validation Loss Decreased({min_valid_loss:.6f}--->{valid_loss:.6f})'
-                          f' \t Saving The Model')
-                    min_valid_loss = valid_loss
-                    torch.save(net.state_dict(), PATH)
+        if min_valid_loss > valid_loss:
+            print(f'Validation Loss Decreased({min_valid_loss:.6f}--->{valid_loss:.6f})'
+                  f' \t Saving The Model')
+            min_valid_loss = valid_loss
+            torch.save(net.state_dict(), PATH)
 
     print('Finished Training')
+
 
 def test(net):
     correct = 0
