@@ -17,7 +17,7 @@ PATH = './cifar_net.pth'
 rate_learning = 0.001
 
 run = neptune.init_run(
-    name="ResNet101 & DropOut & Data Aug",
+    name="ResNet18 & DropOut & Data Aug",
     project="vidarlab/CIFA10Training",
     api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vbmV3LXVpLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9uZXctdWkubmVwdHVuZS5haSIsImFwaV9rZXkiOiJjMzhhZjM5OS1kZjdjLTQ3MzAtODcyMS0yN2JiMWQyNDhhMGYifQ==",
 )
@@ -28,12 +28,13 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 # Load image train & test data
 transform = transforms.Compose(
      [transforms.RandomHorizontalFlip(),
+      transforms.RandomAutocontrast(),
       transforms.RandomGrayscale(),
       transforms.ToTensor(),
       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
 
 batch_size = 256
-epochs = 42
+epochs = 64
 
 params = {
     "learning_rate": rate_learning,
@@ -99,8 +100,10 @@ def train_gpu(net):
     # Define loss function & optimizer
     criterion = nn.CrossEntropyLoss(weight=None, size_average=None, ignore_index=- 100,
                                     reduce=None, reduction='mean', label_smoothing=0.1)
-    optimizer = optim.RMSprop(net.parameters(), lr=rate_learning, alpha=0.99,
-                              eps=1e-08,weight_decay=0.001, momentum=0, centered=False)
+    # optimizer = optim.RMSprop(net.parameters(), lr=rate_learning, alpha=0.99,
+    #                           eps=1e-08,weight_decay=0.001, momentum=0, centered=False)
+    optimizer = optim.SGD(net.parameters(), lr=rate_learning, momentum=0.9)
+
     min_valid_loss = np.inf
 
     for epoch in range(epochs):  # loop over the dataset multiple times
@@ -134,7 +137,7 @@ def train_gpu(net):
             for j, valid_data in enumerate(validloader,0):
                 valid_inputs, valid_labels = valid_data[0].to(device), valid_data[1].to(device)
                 valid_outputs = net(valid_inputs)
-                valid_loss = criterion(valid_outputs, valid_labels) * valid_inputs.size(0)
+                valid_loss += criterion(valid_outputs, valid_labels).item()
 
             valid_loss /= len(validloader)
 
@@ -219,8 +222,8 @@ def classAccuracy(net):
 def main():
     #net = LeNet()
     # net = torchvision.models.resnet18(pretrained=True)
-    #net = ResNetWithDropout(num_classes=10, p=0.5)
-    net = torchvision.models.resnet101(weights=ResNet101_Weights.DEFAULT)
+    net = ResNetWithDropout(num_classes=10, p=0.5)
+    #net = torchvision.models.resnet101(weights=ResNet101_Weights.DEFAULT)
     #net.fc.register_forward_hook(lambda m, inp, out: F.dropout(out, p=0.5, training=m.training))
 
     #net.load_state_dict(torch.load(PATH))
