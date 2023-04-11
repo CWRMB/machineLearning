@@ -119,20 +119,19 @@ def train_gpu(net):
             loss.backward()
             optimizer.step()
 
-            # print statistics
+            # calculate loss and correct
             running_loss += loss.item()
             _, preds = torch.max(outputs, 1)
             running_correct += (preds == labels).sum().item()
 
-            if i % 10 == 9:  # print every 2000 mini-batches
+            if i % 10 == 9:  # print every 10 mini-batch
                 # print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 10:.3f}')
                 print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 10:.3f} '
                       f'Acc: {running_correct / ((i + 1) * batch_size):.3f}')
+                train_loss = running_loss / 10
                 running_loss = 0.0
-                running_correct = 0
 
-            # Calculate our validation loss
-            if i % 10 == 9:
+                # Calculate our validation loss
                 with torch.no_grad():
                     valid_loss = 0.0
                     net.eval()
@@ -142,16 +141,16 @@ def train_gpu(net):
                         valid_loss = criterion(valid_outputs, valid_labels) * valid_inputs.size(0)
 
                     valid_loss /= len(validloader)
-                print(f'[{epoch + 1}, {i + 1:5d}] validation loss: {valid_loss:.6f}')
 
-                # Calculate the average training loss after epoch
-                avg_train_loss = running_loss / len(trainloader)
-                print(f'Epoch {epoch + 1} \t\t Training Loss: {avg_train_loss:.6f}'
+                # Calculate the training loss
+                print(f'Epoch {epoch + 1} \t\t Training Loss: {train_loss:.6f}'
                       f' \t\t Validation Loss: {valid_loss:.6f}')
 
                 run["train/valid_loss"].append(valid_loss)
-                run["train/loss"].append(avg_train_loss)
-                run["train/accuracy"].append(running_correct / len(trainloader))
+                run["train/loss"].append(train_loss)
+                run["train/accuracy"].append(running_correct / ((i + 1) * batch_size))
+
+                running_correct = 0
 
                 if min_valid_loss > valid_loss:
                     print(f'Validation Loss Decreased({min_valid_loss:.6f}--->{valid_loss:.6f})'
