@@ -34,12 +34,13 @@ transform = transforms.Compose(
       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
 
 batch_size = 256
+epochs = 12
 
 params = {
     "learning_rate": rate_learning,
     "optimizer": "RMSProp",
     "batch_size":batch_size,
-    "epochs": 32
+    "epochs": epochs
 }
 run["parameters"] = params
 
@@ -97,12 +98,13 @@ def train(net):
 
 def train_gpu(net):
     # Define loss function & optimizer
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=None, size_average=None, ignore_index=- 100,
+                                    reduce=None, reduction='mean', label_smoothing=0.1)
     optimizer = optim.RMSprop(net.parameters(), lr=rate_learning, alpha=0.99,
-                              eps=1e-08,weight_decay=0.0001, momentum=0, centered=False)
+                              eps=1e-08,weight_decay=0.001, momentum=0, centered=False)
     min_valid_loss = np.inf
 
-    for epoch in range(32):  # loop over the dataset multiple times
+    for epoch in range(epochs):  # loop over the dataset multiple times
         running_loss = 0.0
         running_correct = 0
         total = 0
@@ -143,7 +145,7 @@ def train_gpu(net):
 
         print(f'Epoch {epoch + 1} \t\t Training Loss: {train_loss:.6f}'
               f' \t\t Validation Loss: {valid_loss:.6f}' 
-              f'Acc%: {accu:.3f}')
+              f'\t\t Acc%: {accu:.3f}')
 
         run["train/valid_loss"].append(valid_loss)
         run["train/loss"].append(train_loss)
@@ -188,6 +190,7 @@ def test_gpu(net):
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+            run["test/accuracy"].append(100 * correct / total)
 
     print(f'Accuracy of the network on the 10000 test images: {100 * correct // total} %')
 
