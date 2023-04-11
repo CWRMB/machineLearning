@@ -33,7 +33,7 @@ transform = transforms.Compose(
       transforms.ToTensor(),
       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
 
-batch_size = 256
+batch_size = 512
 
 params = {
     "learning_rate": rate_learning,
@@ -99,11 +99,12 @@ def train_gpu(net):
     # Define loss function & optimizer
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.RMSprop(net.parameters(), lr=rate_learning, alpha=0.99,
-                              eps=1e-08,weight_decay=0, momentum=0, centered=False)
+                              eps=1e-08,weight_decay=0.0001, momentum=0, centered=False)
     min_valid_loss = np.inf
 
     for epoch in range(32):  # loop over the dataset multiple times
         running_loss = 0.0
+        running_correct = 0
         net.train()
         for i, data in enumerate(trainloader, 0):
             # get the inputs; data is a list of [inputs, labels]
@@ -120,34 +121,43 @@ def train_gpu(net):
 
             # print statistics
             running_loss += loss.item()
+            _, preds = torch.max(outputs, 1)
+            running_correct += (preds == labels).sum().item()
+
             if i % 10 == 9:  # print every 2000 mini-batches
-                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 10:.3f}')
+                # print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 10:.3f}')
+                print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 10:.3f} '
+                      f'Acc: {running_correct / ((i + 1) * batch_size):.3f}')
                 running_loss = 0.0
+                running_correct = 0
 
-        #Calculate our validation loss
-        valid_loss = 0.0
-        net.eval()
-        for i, data in enumerate(validloader,0):
-            inputs, labels = data[0].to(device), data[1].to(device)
+            # Calculate our validation loss
+            if i % 10 == 9:
+                with torch.no_grad():
+                    valid_loss = 0.0
+                    net.eval()
+                    for j, valid_data in enumerate(validloader,0):
+                        valid_inputs, valid_labels = valid_data[0].to(device), valid_data[1].to(device)
+                        valid_outputs = net(valid_inputs)
+                        valid_loss = criterion(valid_outputs, valid_labels) * valid_inputs.size(0)
 
-            target = net(inputs)
-            loss = criterion(target, labels)
-            valid_loss = loss.item() * inputs.size(0)
+                    valid_loss /= len(validloader)
+                print(f'[{epoch + 1}, {i + 1:5d}] validation loss: {valid_loss:.6f}')
 
-            # if i % 10 == 9:
-            #     print(f'[{epoch + 1}, {i + 1:5d}] valid_loss: {valid_loss / len(validloader):.3f}')
-            #     run["train/valid_loss"].append(valid_loss / len(validloader))
-        print(
-            f'Epoch {epoch + 1} \t\t Training Loss: {running_loss / len(trainloader)}'
-            f' \t\t Validation Loss: {valid_loss / len(validloader)}')
-        run["train/loss"].append(running_loss / len(testloader))
-        run["train/loss"].append(valid_loss / len(validloader))
+                # Calculate the average training loss after epoch
+                avg_train_loss = running_loss / len(trainloader)
+                print(f'Epoch {epoch + 1} \t\t Training Loss: {avg_train_loss:.6f}'
+                      f' \t\t Validation Loss: {valid_loss:.6f}')
 
-        if min_valid_loss > valid_loss:
-            print(f'Validation Loss Decreased({min_valid_loss:.6f}--->{valid_loss:.6f})'
-                  f' \t Saving The Model')
-            min_valid_loss = valid_loss
-            torch.save(net.state_dict(), PATH)
+                run["train/valid_loss"].append(valid_loss)
+                run["train/loss"].append(avg_train_loss)
+                run["train/accuracy"].append(running_correct / len(trainloader))
+
+                if min_valid_loss > valid_loss:
+                    print(f'Validation Loss Decreased({min_valid_loss:.6f}--->{valid_loss:.6f})'
+                          f' \t Saving The Model')
+                    min_valid_loss = valid_loss
+                    torch.save(net.state_dict(), PATH)
 
     print('Finished Training')
 
