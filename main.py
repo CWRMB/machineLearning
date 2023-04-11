@@ -8,6 +8,7 @@ import torch.nn as nn
 #from torch.utils.tensorboard import SummaryWriter
 import neptune
 from torch.utils.data import random_split
+from torchvision.models import ResNet101_Weights
 
 from CNN import *
 
@@ -16,15 +17,13 @@ PATH = './cifar_net.pth'
 rate_learning = 0.001
 
 run = neptune.init_run(
-    name="ResNet18 & DropOut & Data Aug",
+    name="ResNet101 & DropOut & Data Aug",
     project="vidarlab/CIFA10Training",
     api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vbmV3LXVpLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9uZXctdWkubmVwdHVuZS5haSIsImFwaV9rZXkiOiJjMzhhZjM5OS1kZjdjLTQ3MzAtODcyMS0yN2JiMWQyNDhhMGYifQ==",
 )
 
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
-#writer = SummaryWriter('runs/resnet18')
 
 # Load image train & test data
 transform = transforms.Compose(
@@ -34,7 +33,7 @@ transform = transforms.Compose(
       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
 
 batch_size = 256
-epochs = 12
+epochs = 42
 
 params = {
     "learning_rate": rate_learning,
@@ -173,7 +172,6 @@ def test(net):
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-            #run["test/accuracy"].append(100*correct // total)
 
     print(f'Accuracy of the network on the 10000 test images: {100 * correct // total} %')
 
@@ -221,15 +219,11 @@ def classAccuracy(net):
 def main():
     #net = LeNet()
     # net = torchvision.models.resnet18(pretrained=True)
-    net = ResNetWithDropout(num_classes=10, p=0.5)
+    #net = ResNetWithDropout(num_classes=10, p=0.5)
+    net = torchvision.models.resnet101(weights=ResNet101_Weights.DEFAULT)
     #net.fc.register_forward_hook(lambda m, inp, out: F.dropout(out, p=0.5, training=m.training))
 
     #net.load_state_dict(torch.load(PATH))
-
-    # net.fc = nn.Sequential(
-    #     nn.Dropout(0.5),
-    #     nn.Linear(net.fc.in_features, 10)
-    # )
 
     # Assuming that we are on a CUDA machine, this should print a CUDA device:
     print(device)
