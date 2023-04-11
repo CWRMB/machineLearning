@@ -17,7 +17,7 @@ PATH = './cifar_net.pth'
 rate_learning = 0.001
 
 run = neptune.init_run(
-    name="ResNet18 & DropOut & Data Aug",
+    name="ResNet18(fc=256) & DropOut & Data Aug",
     project="vidarlab/CIFA10Training",
     api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vbmV3LXVpLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9uZXctdWkubmVwdHVuZS5haSIsImFwaV9rZXkiOiJjMzhhZjM5OS1kZjdjLTQ3MzAtODcyMS0yN2JiMWQyNDhhMGYifQ==",
 )
@@ -38,7 +38,7 @@ epochs = 64
 
 params = {
     "learning_rate": rate_learning,
-    "optimizer": "RMSProp",
+    "optimizer": "SGD",
     "batch_size":batch_size,
     "epochs": epochs
 }
@@ -222,7 +222,8 @@ def classAccuracy(net):
 def main():
     #net = LeNet()
     # net = torchvision.models.resnet18(pretrained=True)
-    net = ResNetWithDropout(num_classes=10, p=0.5)
+    #net = ResNetWithDropout(num_classes=10, p=0.5)
+    net = ResNetWithReducedFC(num_classes=10, p=0.5, fc_channels=256)
     #net = torchvision.models.resnet101(weights=ResNet101_Weights.DEFAULT)
     #net.fc.register_forward_hook(lambda m, inp, out: F.dropout(out, p=0.5, training=m.training))
 
