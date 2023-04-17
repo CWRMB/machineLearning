@@ -33,7 +33,7 @@ transform = transforms.Compose(
       transforms.ToTensor(),
       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
 
-batch_size = 256
+batch_size = 512
 epochs = 64
 
 params = {
@@ -104,11 +104,13 @@ def train_gpu(net):
     #                           eps=1e-08,weight_decay=0.001, momentum=0, centered=False)
     optimizer = optim.SGD(net.parameters(), lr=rate_learning, momentum=0.9)
 
-    min_valid_loss = np.inf
+    #min_valid_loss = np.inf
+    min_valid_acc = np.inf
 
     for epoch in range(epochs):  # loop over the dataset multiple times
         running_loss = 0.0
         running_correct = 0
+        val_correct = 0
         total = 0
         net.train()
         for i, data in enumerate(trainloader, 0):
@@ -138,26 +140,37 @@ def train_gpu(net):
                 valid_inputs, valid_labels = valid_data[0].to(device), valid_data[1].to(device)
                 valid_outputs = net(valid_inputs)
                 valid_loss += criterion(valid_outputs, valid_labels).item()
+                _, val_preds = torch.max(valid_outputs.data, 1)
+                val_total = valid_labels.size(0)
+                val_correct += (val_preds == valid_labels).sum().item()
 
             valid_loss /= len(validloader)
 
-        # Calculate the training loss
+        # Calculate the training loss and accuracy
         train_loss = running_loss / len(trainloader)
         accu = 100.*running_correct/total
+        val_accu = 100.*val_correct/val_total
 
         print(f'Epoch {epoch + 1} \t\t Training Loss: {train_loss:.6f}'
               f' \t\t Validation Loss: {valid_loss:.6f}' 
-              f'\t\t Acc%: {accu:.3f}')
+              f'\t\t Acc%: {accu:.3f}'f'\t\t Valid_Acc%: {val_accu:.3f}')
 
         run["train/valid_loss"].append(valid_loss)
         run["train/loss"].append(train_loss)
         run["train/accuracy"].append(accu)
+        run["train/val_accuracy"].append(val_accu)
 
-        if min_valid_loss > valid_loss:
-            print(f'Validation Loss Decreased({min_valid_loss:.6f}--->{valid_loss:.6f})'
+        # if valid_loss < min_valid_loss:
+        #     print(f'Validation Loss Decreased({min_valid_loss:.6f}--->{valid_loss:.6f})'
+        #           f' \t Saving The Model')
+        #     min_valid_loss = valid_loss
+        #     torch.save(net.state_dict(), PATH)
+        if val_accu > min_valid_acc:
+            print(f'Validation Accuracy increased({min_valid_acc:.6f}--->{val_accu:.6f})'
                   f' \t Saving The Model')
-            min_valid_loss = valid_loss
+            min_valid_acc = val_accu
             torch.save(net.state_dict(), PATH)
+
 
     print('Finished Training')
 
@@ -191,8 +204,6 @@ def test_gpu(net):
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-            run["test/accuracy"].append(100 * correct / total)
-
     print(f'Accuracy of the network on the 10000 test images: {100 * correct // total} %')
 
 
