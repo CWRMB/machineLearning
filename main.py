@@ -17,7 +17,7 @@ PATH = './cifar_net.pth'
 rate_learning = 0.001
 
 run = neptune.init_run(
-    name="ResNet18(fc=256) & DropOut & Data Aug",
+    name="ResNet18(fc=256) & DropOut & 224Image",
     project="vidarlab/CIFA10Training",
     api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vbmV3LXVpLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9uZXctdWkubmVwdHVuZS5haSIsImFwaV9rZXkiOiJjMzhhZjM5OS1kZjdjLTQ3MzAtODcyMS0yN2JiMWQyNDhhMGYifQ==",
 )
@@ -30,10 +30,11 @@ transform = transforms.Compose(
      [transforms.RandomHorizontalFlip(),
       transforms.RandomAutocontrast(),
       transforms.RandomGrayscale(),
+      transforms.Resize(224),
       transforms.ToTensor(),
-      transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+      transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
-batch_size = 512
+batch_size = 2048
 epochs = 64
 
 params = {
@@ -105,13 +106,15 @@ def train_gpu(net):
     optimizer = optim.SGD(net.parameters(), lr=rate_learning, momentum=0.9)
 
     #min_valid_loss = np.inf
-    min_valid_acc = np.inf
+    min_valid_acc = 0
 
     for epoch in range(epochs):  # loop over the dataset multiple times
         running_loss = 0.0
         running_correct = 0
         val_correct = 0
         total = 0
+        val_total = 0
+
         net.train()
         for i, data in enumerate(trainloader, 0):
             # get the inputs; data is a list of [inputs, labels]
@@ -132,7 +135,7 @@ def train_gpu(net):
             total += labels.size(0)
             running_correct += (preds == labels).sum().item()
 
-        # Calculate our validation loss
+        # Calculate our validation loss and accuracy
         with torch.no_grad():
             valid_loss = 0.0
             net.eval()
@@ -141,7 +144,7 @@ def train_gpu(net):
                 valid_outputs = net(valid_inputs)
                 valid_loss += criterion(valid_outputs, valid_labels).item()
                 _, val_preds = torch.max(valid_outputs.data, 1)
-                val_total = valid_labels.size(0)
+                val_total += valid_labels.size(0)
                 val_correct += (val_preds == valid_labels).sum().item()
 
             valid_loss /= len(validloader)
