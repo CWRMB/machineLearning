@@ -9,6 +9,7 @@ import torch.nn as nn
 import neptune
 from torch.utils.data import random_split
 from torchvision.models import ResNet101_Weights
+from timm import models
 
 from CNN import *
 
@@ -34,8 +35,8 @@ transform = transforms.Compose(
       transforms.ToTensor(),
       transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
-batch_size = 2048
-epochs = 64
+batch_size = 256
+epochs = 32
 
 params = {
     "learning_rate": rate_learning,
@@ -237,9 +238,10 @@ def main():
     #net = LeNet()
     # net = torchvision.models.resnet18(pretrained=True)
     #net = ResNetWithDropout(num_classes=10, p=0.5)
-    net = ResNetWithReducedFC(num_classes=10, p=0.5, fc_channels=256)
+    #1 net = ResNetWithReducedFC(num_classes=10, p=0.5, fc_channels=256)
     #net = torchvision.models.resnet101(weights=ResNet101_Weights.DEFAULT)
-    #net.fc.register_forward_hook(lambda m, inp, out: F.dropout(out, p=0.5, training=m.training))
+
+    net = models.vit_tiny_patch16_224(pretrained=True)
 
     #net.load_state_dict(torch.load(PATH))
 
