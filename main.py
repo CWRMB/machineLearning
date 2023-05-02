@@ -18,7 +18,7 @@ PATH = './cifar_net.pth'
 rate_learning = 0.001
 
 run = neptune.init_run(
-    name="ResNet18(fc=256) & DropOut & 224Image",
+    name="ViT16_224 Transformer & 224Image",
     project="vidarlab/CIFA10Training",
     api_token="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vbmV3LXVpLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9uZXctdWkubmVwdHVuZS5haSIsImFwaV9rZXkiOiJjMzhhZjM5OS1kZjdjLTQ3MzAtODcyMS0yN2JiMWQyNDhhMGYifQ==",
 )
@@ -104,7 +104,8 @@ def train_gpu(net):
                                     reduce=None, reduction='mean', label_smoothing=0.1)
     # optimizer = optim.RMSprop(net.parameters(), lr=rate_learning, alpha=0.99,
     #                           eps=1e-08,weight_decay=0.001, momentum=0, centered=False)
-    optimizer = optim.SGD(net.parameters(), lr=rate_learning, momentum=0.9)
+    #optimizer = optim.SGD(net.parameters(), lr=rate_learning, momentum=0.9)
+    optimizer = optim.Adam(net.parameters(), lr=rate_learning, weight_decay=0.1)
 
     #min_valid_loss = np.inf
     min_valid_acc = 0
