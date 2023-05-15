@@ -15,7 +15,7 @@ from CNN import *
 
 PATH = './cifar_net.pth'
 
-rate_learning = 0.001
+rate_learning = 0.00005
 
 run = neptune.init_run(
     name="ViT16_224 Transformer & 224Image",
@@ -40,7 +40,7 @@ epochs = 32
 
 params = {
     "learning_rate": rate_learning,
-    "optimizer": "SGD",
+    "optimizer": "Adam",
     "batch_size":batch_size,
     "epochs": epochs
 }
@@ -105,7 +105,7 @@ def train_gpu(net):
     # optimizer = optim.RMSprop(net.parameters(), lr=rate_learning, alpha=0.99,
     #                           eps=1e-08,weight_decay=0.001, momentum=0, centered=False)
     #optimizer = optim.SGD(net.parameters(), lr=rate_learning, momentum=0.9)
-    optimizer = optim.Adam(net.parameters(), lr=rate_learning, weight_decay=0.1)
+    optimizer = optim.Adam(net.parameters(), lr=rate_learning, weight_decay=0.0001)
 
     #min_valid_loss = np.inf
     min_valid_acc = 0
@@ -242,7 +242,7 @@ def main():
     #1 net = ResNetWithReducedFC(num_classes=10, p=0.5, fc_channels=256)
     #net = torchvision.models.resnet101(weights=ResNet101_Weights.DEFAULT)
 
-    net = models.vit_tiny_patch16_224(pretrained=True)
+    net = models.vit_base_patch16_224(pretrained=True)
 
     #net.load_state_dict(torch.load(PATH))
 
